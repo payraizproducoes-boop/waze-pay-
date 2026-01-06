@@ -2,183 +2,234 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Waze Pay</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<title>Waze Pay - Seleção e Sorteio</title>
 <style>
 body {
     font-family: Arial, sans-serif;
-    background: #f2f2f2;
     text-align: center;
-    margin: 0;
-    padding: 15px;
+    background: #1b8f3a; /* Fundo verde */
+    padding: 20px;
+    color: white;
 }
-
-h1 {
-    color: #1b8f3a;
+h1, h3 {
     margin-bottom: 10px;
 }
-
-#relogio {
-    font-size: 16px;
+#relogio-container {
+    font-size: 24px;
     font-weight: bold;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-    max-width: 420px;
-    margin: auto;
+.grid, .bolinhas, .historico {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
 }
-
-.numero {
-    background: white;
+.numero, .bolinha {
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
-    padding: 12px;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-weight: bold;
-    cursor: pointer;
-    border: 2px solid #1b8f3a;
+    font-size: 18px;
+    background: white;
     color: #1b8f3a;
-    user-select: none;
+    cursor: pointer;
 }
-
 .numero.selecionado {
     background: #1b8f3a;
     color: white;
 }
-
-#resultado {
-    margin-top: 15px;
-    font-size: 16px;
-}
-
-#botaoWhatsapp {
-    display: none;
-    margin-top: 20px;
-    padding: 14px 20px;
-    font-size: 18px;
-    background: #25D366;
+.bolinha.ativa {
+    background: #1b8f3a;
     color: white;
+}
+.bolinha.historico {
+    background: #ff4d4d;
+    color: white;
+}
+button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background: white;
+    color: #1b8f3a;
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    font-weight: bold;
 }
 </style>
 </head>
-
 <body>
 
 <h1>Waze Pay</h1>
 
-<div id="relogio">Carregando próximo sorteio...</div>
-
-<p>Escolha <b>5 números</b></p>
-
-<div class="grid" id="grade"></div>
-
-<div id="resultado">
-Números escolhidos: <span id="numeros">Nenhum</span>
+<div id="relogio-container">
+  Próximo sorteio em: <span id="relogio">00:00</span>
 </div>
 
-<button id="botaoWhatsapp" onclick="irParaWhatsapp()">
-Continuar para WhatsApp
-</button>
+<h3>Escolha 5 números:</h3>
+<div class="grid" id="grade"></div>
+
+<button id="btn-whatsapp" style="display:none;">Enviar para WhatsApp</button>
+
+<p>Seus números escolhidos: <span id="numeros">Nenhum</span></p>
+
+<h3>Números do Sorteio:</h3>
+<div class="bolinhas" id="bolinhas"></div>
+
+<h3>Histórico de Sorteios:</h3>
+<div class="historico" id="historico"></div>
 
 <script>
-// ===== RELÓGIO =====
-function atualizarRelogio() {
-    const agora = new Date();
-    const h = agora.getHours();
-    const m = agora.getMinutes();
-    const s = agora.getSeconds();
-
-    const rel = document.getElementById("relogio");
-
-    if (h < 7 || h >= 24) {
-        rel.innerText = "⛔ Apostas encerradas. Retornamos às 07:00.";
-        return;
-    }
-
-    let proxMin = Math.ceil(m / 15) * 15;
-    let proxHora = h;
-
-    if (proxMin === 60) {
-        proxMin = 0;
-        proxHora++;
-    }
-
-    if (proxHora >= 24) {
-        rel.innerText = "⛔ Último sorteio do dia encerrado.";
-        return;
-    }
-
-    const prox = new Date();
-    prox.setHours(proxHora, proxMin, 0, 0);
-
-    const diff = prox - agora;
-    const minRest = Math.floor(diff / 60000);
-    const segRest = Math.floor((diff % 60000) / 1000);
-
-    rel.innerText =
-        "⏰ Próximo sorteio às " +
-        String(proxHora).padStart(2, "0") + ":" +
-        String(proxMin).padStart(2, "0") +
-        " — em " +
-        String(minRest).padStart(2, "0") + ":" +
-        String(segRest).padStart(2, "0");
-}
-
-setInterval(atualizarRelogio, 1000);
-atualizarRelogio();
-
-// ===== NÚMEROS =====
 const grade = document.getElementById("grade");
 const numerosSpan = document.getElementById("numeros");
-const botaoWhatsapp = document.getElementById("botaoWhatsapp");
-
+const btnWhats = document.getElementById("btn-whatsapp");
 let escolhidos = [];
+const MAX_ESCOLHA = 5;
 
-for (let i = 1; i <= 99; i++) {
-    const d = document.createElement("div");
-    d.className = "numero";
-    d.innerText = i.toString().padStart(2, "0");
-
-    d.onclick = () => {
-        const n = d.innerText;
-
-        if (d.classList.contains("selecionado")) {
-            d.classList.remove("selecionado");
-            escolhidos = escolhidos.filter(x => x !== n);
+// Criação da grade de números
+for(let i=1;i<=99;i++){
+    const div = document.createElement("div");
+    div.className = "numero";
+    div.innerText = i.toString().padStart(2,'0');
+    div.onclick = ()=>{
+        if(div.classList.contains("selecionado")){
+            div.classList.remove("selecionado");
+            escolhidos = escolhidos.filter(n => n !== div.innerText);
         } else {
-            if (escolhidos.length >= 5) {
-                alert("Você só pode escolher 5 números.");
+            if(escolhidos.length >= MAX_ESCOLHA){
+                alert("Você só pode escolher 5 números!");
                 return;
             }
-            d.classList.add("selecionado");
-            escolhidos.push(n);
+            div.classList.add("selecionado");
+            escolhidos.push(div.innerText);
         }
-
-        escolhidos.sort();
-        numerosSpan.innerText = escolhidos.join(", ");
-        botaoWhatsapp.style.display = escolhidos.length === 5 ? "block" : "none";
-    };
-
-    grade.appendChild(d);
+        numerosSpan.innerText = escolhidos.sort((a,b)=>a-b).join(", ");
+        btnWhats.style.display = (escolhidos.length===MAX_ESCOLHA) ? "inline-block" : "none";
+    }
+    grade.appendChild(div);
 }
 
-// ===== WHATSAPP =====
-function irParaWhatsapp() {
-    const texto =
-        "Meus números escolhidos: " +
-        escolhidos.join(", ") +
-        ". Aguardando aprovação.";
-
-    const telefone = "5511916699712";
-    const url = "https://wa.me/" + telefone + "?text=" + encodeURIComponent(texto);
-    window.location.href = url;
+// Função do botão WhatsApp
+btnWhats.onclick = ()=>{
+    const msg = `Meus números escolhidos: ${escolhidos.sort((a,b)=>a-b).join(", ")}. Aguardando aprovação.`;
+    const numeroWhats = "5511916699712"; // seu número WhatsApp
+    const url = `https://wa.me/${numeroWhats}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
 }
+
+// Confirmar números (opcional)
+function confirmar(){
+    if(escolhidos.length!==MAX_ESCOLHA){
+        alert("Escolha exatamente 5 números!");
+        return;
+    }
+    alert("Números confirmados: " + escolhidos.sort((a,b)=>a-b).join(", "));
+}
+
+// Sorteio
+const bolinhasContainer = document.getElementById("bolinhas");
+const historicoContainer = document.getElementById("historico");
+const MAX_BOLINHAS = 10;
+let numerosAtuais = [];
+let historicoNumeros = [];
+
+function criarBolinhas(container){
+    container.innerHTML = '';
+    for(let i=0;i<MAX_BOLINHAS;i++){
+        const b = document.createElement('div');
+        b.className = 'bolinha';
+        container.appendChild(b);
+    }
+}
+
+function atualizarBolinhas(){
+    const bolinhas = bolinhasContainer.querySelectorAll('.bolinha');
+    for(let i=0;i<MAX_BOLINHAS;i++){
+        if(numerosAtuais[i]!==undefined){
+            bolinhas[i].textContent = numerosAtuais[i];
+            bolinhas[i].className = 'bolinha ativa';
+        } else {
+            bolinhas[i].textContent = '';
+            bolinhas[i].className = 'bolinha';
+        }
+    }
+    const historico = historicoContainer.querySelectorAll('.bolinha');
+    for(let i=0;i<MAX_BOLINHAS;i++){
+        if(historicoNumeros[i]!==undefined){
+            historico[i].textContent = historicoNumeros[i];
+            historico[i].className = 'bolinha historico';
+        } else {
+            historico[i].textContent = '';
+            historico[i].className = 'bolinha';
+        }
+    }
+}
+
+function gerarNumeroAleatorio(excluir=[]){
+    let n;
+    do{
+        n = String(Math.floor(Math.random()*99)+1).padStart(2,'0');
+    } while(excluir.includes(n));
+    return n;
+}
+
+function sortearUmPorUm(){
+    historicoNumeros = [...numerosAtuais]; // move para histórico
+    numerosAtuais = [];
+    let fila = [];
+    for(let i=0;i<MAX_BOLINHAS;i++){
+        fila.push(gerarNumeroAleatorio(fila));
+    }
+    let index=0;
+    const intervalo = setInterval(()=>{
+        numerosAtuais[index]=fila[index];
+        atualizarBolinhas();
+        index++;
+        if(index>=MAX_BOLINHAS){
+            clearInterval(intervalo);
+        }
+    }, 500);
+}
+
+// Relógio do próximo sorteio
+function proximoSorteio(){
+    const agora = new Date();
+    let minutos = Math.floor(agora.getMinutes()/15)*15 + 15;
+    let hora = agora.getHours();
+    if(minutos>=60){ minutos-=60; hora+=1;}
+    if(hora>=24){ hora=7; minutos=0;}
+    return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), hora, minutos, 0);
+}
+
+function atualizarRelogio(){
+    const agora = new Date();
+    const prox = proximoSorteio();
+    const diff = prox - agora;
+    const minutos = String(Math.floor(diff/60000)).padStart(2,'0');
+    const segundos = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+    document.getElementById('relogio').textContent = `${minutos}:${segundos}`;
+    if(diff<=0){
+        sortearUmPorUm();
+        setTimeout(atualizarRelogio, 1000);
+    } else {
+        setTimeout(atualizarRelogio, 1000);
+    }
+}
+
+// Inicialização
+window.onload = ()=>{
+    criarBolinhas(bolinhasContainer);
+    criarBolinhas(historicoContainer);
+    atualizarBolinhas();
+    atualizarRelogio();
+};
 </script>
 
 </body>
